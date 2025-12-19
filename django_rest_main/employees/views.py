@@ -9,9 +9,11 @@ from .serializers import EmployeeSerializer
 from api.paginations import CustomPagination
 from employees.models import Employee
 
+
 # Create your class based views here.
 class EmployeeList(APIView):
     permission_classes = [AllowAny]
+
     def get(self, request):
         employees = Employee.objects.all()
         # Instantiate your custom paginator (in class based views(using with APIView), we can't directly implement custom pagination like in generics/mixins/ModalViewSets etc.)
@@ -21,38 +23,41 @@ class EmployeeList(APIView):
         # Return paginated response
         serializer = EmployeeSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
-    
+
     def post(self, request):
         serializer = EmployeeSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+
 class EmployeeDetail(APIView):
     permission_classes = [AllowAny]
+
     def findEmployeeById(self, id):
         try:
             return Employee.objects.get(pk=id)
         except Employee.DoesNotExist:
             raise Http404("Employee not found")
-    
+
     def get(self, request, id):
         employee = self.findEmployeeById(id)
         serializer = EmployeeSerializer(employee)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    def put(self, request, id):   
+
+    def put(self, request, id):
         employee = self.findEmployeeById(id)
         serializer = EmployeeSerializer(employee, data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     def delete(self, request, id):
         employee = self.findEmployeeById(id)
         employee.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 
 # Mixins
@@ -83,7 +88,7 @@ class EmployeeDetail(mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.
     
     def delete(self, request, id):
         return self.destroy(request, id)
-"""    
+"""
 
 # Generics
 """
@@ -142,10 +147,10 @@ class EmployeeViewset(viewsets.ViewSet):
 # ModelViewSet
 class EmployeeViewset(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    
+
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
     pagination_class = CustomPagination
     filter_backends = [SearchFilter, OrderingFilter]
-    search_fields = ['emp_name', 'designation']
-    ordering_fields = ['id', 'emp_name']
+    search_fields = ["emp_name", "designation"]
+    ordering_fields = ["id", "emp_name"]
