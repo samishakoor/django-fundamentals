@@ -19,7 +19,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["email", "name", "password", "confirm_password", "tc"]
+        fields = ["email", "name", "password", "confirm_password"]
         extra_kwargs = {"password": {"write_only": True}}
 
     # Validating Password and Confirm Password while Registration
@@ -29,11 +29,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         confirm_password(password, password2)
         return attrs
 
-    def create(self, validated_data):
-        # Remove confirm_password before creating user (it's not a model field)
-        validated_data.pop("confirm_password", None)
-        return User.objects.create_user(**validated_data)
-
 
 class UserLoginSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(max_length=255)
@@ -41,6 +36,13 @@ class UserLoginSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["email", "password"]
+
+
+class UserVerifyEmailSerializer(serializers.Serializer):
+    token = serializers.CharField(allow_blank=False, allow_null=False)
+
+    class Meta:
+        fields = ["token"]
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -82,7 +84,7 @@ class UserForgotPasswordSerializer(serializers.Serializer):
             user = User.objects.get(email=email)
             uid = urlsafe_base64_encode(force_bytes(user.id))
             token = PasswordResetTokenGenerator().make_token(user)
-            link = "http://localhost:3000/reset-password/" + uid + "/" + token
+            link = f"http://localhost:3000/reset-password/{uid}?token={token}"
             email_body_plain = "Click Following Link to Reset Your Password " + link
             send_email(
                 to_email=user.email,
