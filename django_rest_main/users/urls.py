@@ -7,12 +7,14 @@ from .views import (
     ForgotPasswordView,
     ResetPasswordView,
     UserVerifyEmailView,
+    UserResendVerifyEmailView,
 )
 
 urlpatterns = [
     # Public endpoints
     path("register/", UserRegistrationView.as_view(), name="register"),
     path("verify-email/", UserVerifyEmailView.as_view(), name="verify-email"),
+    path("resend-verify-email/", UserResendVerifyEmailView.as_view(), name="resend-verify-email"),
     path("login/", UserLoginView.as_view(), name="login"),
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/<uid>/<token>/', ResetPasswordView.as_view(), name='reset-password'),

@@ -1,7 +1,6 @@
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from users.models import User
 from users.services.user_service import UserService
 from rest_framework.permissions import AllowAny
 from .serializers import (
@@ -12,6 +11,7 @@ from .serializers import (
     UserForgotPasswordSerializer,
     UserPasswordResetSerializer,
     UserVerifyEmailSerializer,
+    UserResendVerifyEmailSerializer,
 )
 
 
@@ -27,6 +27,7 @@ class UserRegistrationView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
+
 class UserVerifyEmailView(APIView):
     permission_classes = [AllowAny]
 
@@ -34,7 +35,20 @@ class UserVerifyEmailView(APIView):
         serializer = UserVerifyEmailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         UserService.verify_email(serializer.validated_data)
-        return Response({"msg": "Email Verified Successfully"}, status=status.HTTP_200_OK)
+        return Response(
+            {"msg": "Email Verified Successfully"}, status=status.HTTP_200_OK
+        )
+
+
+class UserResendVerifyEmailView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, format=None):
+        serializer = UserResendVerifyEmailSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        UserService.resend_verify_email(serializer.validated_data)
+        return Response({"msg": "Email Resend Successfully"}, status=status.HTTP_200_OK)
+
 
 class UserLoginView(APIView):
     permission_classes = [AllowAny]
@@ -57,10 +71,9 @@ class UserProfileView(APIView):
 
 class UserChangePasswordView(APIView):
     def post(self, request, format=None):
-        serializer = UserChangePasswordSerializer(
-            data=request.data, context={"user": request.user}
-        )
+        serializer = UserChangePasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        UserService.change_password(serializer.validated_data, request.user)
         return Response(
             {"msg": "Password Changed Successfully"}, status=status.HTTP_200_OK
         )
@@ -72,6 +85,7 @@ class ForgotPasswordView(APIView):
     def post(self, request, format=None):
         serializer = UserForgotPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        UserService.forgot_password(serializer.validated_data)
         return Response(
             {"msg": "Password Reset link send. Please check your Email"},
             status=status.HTTP_200_OK,
@@ -86,6 +100,7 @@ class ResetPasswordView(APIView):
             data=request.data, context={"uid": uid, "token": token}
         )
         serializer.is_valid(raise_exception=True)
+        UserService.reset_password(serializer.validated_data)
         return Response(
             {"msg": "Password Reset Successfully"}, status=status.HTTP_200_OK
         )
