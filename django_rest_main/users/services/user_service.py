@@ -1,4 +1,3 @@
-from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from users.models import User
 from api.utils import send_email
 from django.utils.encoding import smart_str, force_bytes
@@ -11,6 +10,8 @@ from rest_framework.exceptions import (
     ValidationError,
     PermissionDenied,
 )
+import uuid
+from django.core.cache import cache
 from django.contrib.auth import authenticate
 
 
@@ -22,25 +23,8 @@ def get_tokens_for_user(user):
     }
 
 
-def verify_token(token: str, max_age: int = 60 * 60 * 24):
-    signer = TimestampSigner()
-
-    try:
-        user_id = signer.unsign(token, max_age)
-    except SignatureExpired:
-        raise ValidationError("Token expired")
-    except BadSignature:
-        raise ValidationError("Invalid token")
-    return user_id
-
-
-def sign_token(user_id):
-    signer = TimestampSigner()
-    try:
-        token = signer.sign(str(user_id))
-    except Exception as e:
-        raise ValidationError(e)
-    return token
+def create_token() -> str:
+    return str(uuid.uuid4())
 
 
 def find_user_by_id(user_id):
@@ -62,6 +46,23 @@ def find_one(email: str, all: bool = False):
     return User.objects.filter(**filters).first()
 
 
+def setVerificationTokenInRedis(id: str):
+    token = create_token()
+    set_verification_token(token, id)
+    return token
+
+
+def set_verification_token(token: str, keyValue: str):
+    return cache.set(f"VERIFY-{token}", keyValue, timeout=60 * 60)  # 1 hour
+
+
+def getVerificationTokenFromRedis(token: str):
+    value = cache.get(f"VERIFY-{token}", None)
+    if value is None:
+        raise ValidationError("Token is not Valid or Expired")
+    return value
+
+
 class UserService:
     @staticmethod
     def register_user(data):
@@ -70,9 +71,9 @@ class UserService:
         password = data["password"]
 
         user = User.objects.create_user(email=email, name=name, password=password)
-        token = sign_token(user.id)
+        token = setVerificationTokenInRedis(user.id)
         link = f"http://localhost:3000/verify-email?token={token}"
-        email_body_plain = "Click Following Link to Verify Your Email " + link
+        email_body_plain = f"Click on the following link to verify your email:\n{link}"
         send_email(
             to_email=user.email,
             subject="Verify Your Email",
@@ -83,12 +84,13 @@ class UserService:
     @staticmethod
     def verify_email(data):
         token = data["token"]
-        user_id = verify_token(token)
+        user_id = getVerificationTokenFromRedis(token)
         user = find_user_by_id(user_id)
         if user.is_active:
             raise PermissionDenied("Email already verified")
         user.is_active = True
         user.save()
+        cache.delete(f"VERIFY-{token}")
         return user
 
     @staticmethod
@@ -98,9 +100,9 @@ class UserService:
         if user:
             if user.is_active:
                 raise PermissionDenied("Email already verified")
-            token = sign_token(user.id)
+            token = setVerificationTokenInRedis(user.id)
             link = f"http://localhost:3000/verify-email?token={token}"
-            email_body_plain = "Click Following Link to Verify Your Email " + link
+            email_body_plain = f"Click on the following link to verify your email:\n{link}"
             send_email(
                 to_email=user.email,
                 subject="Verify Your Email",
@@ -147,7 +149,7 @@ class UserService:
             token = PasswordResetTokenGenerator().make_token(user)
             print(token)
             link = f"http://localhost:3000/reset-password/{uid}?token={token}"
-            email_body_plain = "Click Following Link to Reset Your Password " + link
+            email_body_plain = f"Click on the following link to reset your password:\n{link}"
             send_email(
                 to_email=user.email,
                 subject="Reset Your Password",
